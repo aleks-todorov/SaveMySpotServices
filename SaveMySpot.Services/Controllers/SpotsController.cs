@@ -1,4 +1,5 @@
 ﻿using SaveMySpot.Models;
+using SaveMySpot.Services.Models;
 using System;
 using System.Linq;
 using System.Net;
@@ -10,19 +11,27 @@ namespace SaveMySpot.Services.Controllers
     public class SpotsController : BaseController
     {
         private const int Sha1Length = 40;
-        private const int titleMinLenght = 5;
-        private const int titleMaxLenght = 35;
-        private const String titleAvailableSymbols = "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890_-.!@$? ";
+        private const int TitleMinLenght = 5;
+        private const int TitleMaxLenght = 35;
+        private const String TitleAvailableSymbols = "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890_-.!@$? ";
 
         [HttpGet]
-        public IQueryable<Spot> GetSpots(string authCode)
+        public IQueryable<SpotModel> GetSpots(string authCode)
         {
             var responseMsg = this.PerformOperationAndHandleExceptions(
                 () =>
                 {
                     ValidateAuthCode(authCode);
 
-                    var spots = this.Data.Spots.All().Where(s => s.AuthCode == authCode);
+                    var spots = from spot in this.Data.Spots.All()
+                                where spot.AuthCode == authCode
+                                select new SpotModel
+                                {
+                                    AuthCode = spot.AuthCode,
+                                    Longitude = spot.Longitude,
+                                    Latitude = spot.Latitude,
+                                    Title = spot.Title 
+                                };
 
                     return spots;
                 });
@@ -31,7 +40,7 @@ namespace SaveMySpot.Services.Controllers
         }
 
         [HttpPost]
-        public HttpResponseMessage PostSpot(Spot model)
+        public HttpResponseMessage PostSpot(SpotModel model)
         {
             var responseMsg = this.PerformOperationAndHandleExceptions(
                 () =>
@@ -43,7 +52,16 @@ namespace SaveMySpot.Services.Controllers
                      
                     ValidateModel(model);
 
-                    this.Data.Spots.Add(model);
+                    var spot = new Spot()
+                    {
+                        Title = model.Title,
+                        Latitude = model.Latitude,
+                        Longitude = model.Longitude,
+                        AuthCode = model.AuthCode
+
+                    };
+
+                    this.Data.Spots.Add(spot);
 
                     this.Data.SaveChanges();
 
@@ -56,7 +74,7 @@ namespace SaveMySpot.Services.Controllers
             return responseMsg;
         }
 
-        private void ValidateModel(Spot model)
+        private void ValidateModel(SpotModel model)
         {
             ValidateAuthCode(model.AuthCode);
             ValidateTitle(model.Title); 
@@ -64,12 +82,12 @@ namespace SaveMySpot.Services.Controllers
 
         private void ValidateTitle(string title)
         {
-            if (title.Length < titleMinLenght || title.Length > titleMaxLenght)
+            if (title.Length < TitleMinLenght || title.Length > TitleMaxLenght)
             {
-                throw new ArgumentOutOfRangeException(string.Format("Title lenght must be between {0} and {1} characters!", titleMinLenght, titleMaxLenght));
+                throw new ArgumentOutOfRangeException(string.Format("Title lenght must be between {0} and {1} characters!", TitleMinLenght, TitleMaxLenght));
             }
 
-            else if (title.Any(ch => !titleAvailableSymbols.Contains(ch)))
+            else if (title.Any(ch => !TitleAvailableSymbols.Contains(ch)))
             {
                 throw new ArgumentOutOfRangeException(string.Format("Invalid character in title. Please try again!"));
             }
